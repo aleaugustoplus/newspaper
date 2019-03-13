@@ -689,7 +689,7 @@ class ContentExtractor(object):
                 if 'index.html' in path_chunks:
                     path_chunks.remove('index.html')
 
-                if len(path_chunks) == 1 and len(path_chunks[0]) < 14:
+                if len(path_chunks) >= 1 and len(path_chunks) <= 5 and len(path_chunks[0]) < 14:
                     valid_categories.append(domain + path)
                 else:
                     if self.config.verbose:
