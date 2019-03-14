@@ -175,8 +175,6 @@ class Source(object):
         desc = self.extractor.get_meta_description(self.doc)
         self.description = desc
 
-    # Cache of 8 hours
-    @utils.cache_disk(seconds=(28800 * 1), cache_folder=ANCHOR_DIRECTORY)
     def download(self):
         """Downloads html of source
         """
