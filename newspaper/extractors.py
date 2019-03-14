@@ -16,6 +16,7 @@ import logging
 import re
 import re
 from collections import defaultdict
+from bs4 import BeautifulSoup
 
 from dateutil.parser import parse as date_parser
 from tldextract import tldextract
@@ -169,7 +170,7 @@ class ContentExtractor(object):
         #    return [] # Failed to find anything
         # return authors
 
-    def get_publishing_date(self, url, doc):
+    def get_publishing_date(self, url, doc, html=""):
         """3 strategies for publishing date extraction. The strategies
         are descending in accuracy and the next strategy is only
         attempted if a preferred one fails.
@@ -216,6 +217,8 @@ class ContentExtractor(object):
              'content': 'content'},
             {'attribute': 'pubdate', 'value': 'pubdate',
              'content': 'datetime'},
+            {'attribute': 'datetime', 'value': 'pubdate',
+             'content': 'datetime'}
         ]
         for known_meta_tag in PUBLISH_DATE_TAGS:
             meta_tags = self.parser.getElementsByTag(
@@ -229,6 +232,24 @@ class ContentExtractor(object):
                 datetime_obj = parse_date_str(date_str)
                 if datetime_obj:
                     return datetime_obj
+        if html:
+            # CBC
+            parsed_article = BeautifulSoup(html, 'lxml-xml')
+            publish_date = parsed_article.find("time", {"class": "timeStamp"})
+            if publish_date:
+                publish_date = publish_date.get("dateTime")
+                publish_date = date_parser(publish_date)
+                if publish_date:
+                    return publish_date
+
+            # LeDevoir
+            parsed_article = BeautifulSoup(html, 'html.parser')
+            publish_date = parsed_article.find("time")
+            if publish_date:
+                publish_date = publish_date.get("datetime")
+                publish_date = date_parser(publish_date)
+                if publish_date:
+                    return publish_date
 
         return None
 
