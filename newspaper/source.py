@@ -97,7 +97,7 @@ class Source(object):
 
         self.set_feeds()
         self.download_feeds()  # mthread
-        # self.parse_feeds()
+        self.parse_feeds()
 
         self.generate_articles()
 
@@ -133,7 +133,7 @@ class Source(object):
         """Don't need to cache getting feed urls, it's almost
         instant with xpath
         """
-        common_feed_urls = ['/feed', '/feeds', '/rss']
+        common_feed_urls = ['/feed', '/feeds', '/rss', '/rss.php', 'rss/225.xml']
         common_feed_urls = [urljoin(self.url, url) for url in common_feed_urls]
 
         split = urlsplit(self.url)
@@ -175,6 +175,8 @@ class Source(object):
         desc = self.extractor.get_meta_description(self.doc)
         self.description = desc
 
+    # Cache of 8 hours
+    @utils.cache_disk(seconds=(28800 * 1), cache_folder=ANCHOR_DIRECTORY)
     def download(self):
         """Downloads html of source
         """
@@ -326,6 +328,7 @@ class Source(object):
         articles = feed_articles + category_articles
         uniq = {article.url: article for article in articles}
         return list(uniq.values())
+
 
     def generate_articles(self, limit=5000):
         """Saves all current articles of news source, filter out bad urls
