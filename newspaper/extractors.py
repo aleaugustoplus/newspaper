@@ -25,6 +25,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 from . import urls
 from .utils import StringReplacement, StringSplitter
 
+
 log = logging.getLogger(__name__)
 
 MOTLEY_REPLACEMENT = StringReplacement("&#65533;", "")
@@ -405,7 +406,9 @@ class ContentExtractor(object):
             feed_urls = [e.get('href') for e in feed_elements if e.get('href')]
             total_feed_urls.extend(feed_urls)
 
-        total_feed_urls = total_feed_urls[:50]
+            total_feed_urls.extend(self.config.feed_url_extractor(self.parser, category))
+
+        # total_feed_urls = total_feed_urls[:50]
         total_feed_urls = [urls.prepare_url(f, source_url)
                            for f in total_feed_urls]
         total_feed_urls = list(set(total_feed_urls))
@@ -632,12 +635,19 @@ class ContentExtractor(object):
             return []
         # If we are extracting from raw text
         if regex:
+            parsed_doc = BeautifulSoup(doc_or_html, 'lxml-xml')
+            items = parsed_doc.find_all('item')
+            links = []
+            for item in items:
+                links.append(item.find('link').string)
+
             doc_or_html = re.sub('<[^<]+?>', ' ', str(doc_or_html))
             doc_or_html = re.findall(
                 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|'
                 '(?:%[0-9a-fA-F][0-9a-fA-F]))+', doc_or_html)
             doc_or_html = [i.strip() for i in doc_or_html]
-            return doc_or_html or []
+            links.extend(doc_or_html or [])
+            return links
         # If the doc_or_html is html, parse it into a root
         if isinstance(doc_or_html, str):
             doc = self.parser.fromstring(doc_or_html)

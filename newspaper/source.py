@@ -91,9 +91,9 @@ class Source(object):
         self.download()
         self.parse()
 
-        self.set_categories()
-        self.download_categories()  # mthread
-        self.parse_categories()
+        # self.set_categories()
+        # self.download_categories()  # mthread
+        # self.parse_categories()
 
         self.set_feeds()
         self.download_feeds()  # mthread
@@ -134,6 +134,7 @@ class Source(object):
         instant with xpath
         """
         common_feed_urls = ['/feed', '/feeds', '/rss', '/rss.php', 'rss/225.xml']
+        common_feed_urls.extend(self.config.feeds_urls)
         common_feed_urls = [urljoin(self.url, url) for url in common_feed_urls]
 
         split = urlsplit(self.url)
@@ -164,7 +165,8 @@ class Source(object):
         common_feed_urls_as_categories = [c for c in common_feed_urls_as_categories if
                                           c.doc is not None]
 
-        categories_and_common_feed_urls = self.categories + common_feed_urls_as_categories
+        # categories_and_common_feed_urls = self.categories + common_feed_urls_as_categories
+        categories_and_common_feed_urls = common_feed_urls_as_categories
         urls = self.extractor.get_feed_urls(self.url, categories_and_common_feed_urls)
         self.feeds = [Feed(url=url) for url in urls]
 
@@ -209,9 +211,8 @@ class Source(object):
                 self.feeds[index].rss = network.get_html(
                     req.url, response=req.resp)
             else:
-                log.warning(('Deleting feed %s from source %s due to '
-                             'download error') %
-                             (self.categories[index].url, self.url))
+                log.warning(('Deleting feed %s due to '
+                             'download error') % self.url)
         self.feeds = [f for f in self.feeds if f.rss]
 
     def parse(self):

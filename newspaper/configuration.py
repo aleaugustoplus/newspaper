@@ -73,6 +73,8 @@ class Configuration(object):
 
         self.thread_timeout_seconds = 1
         self.ignored_content_types_defaults = {}
+        self.feeds_urls = []
+        self.feed_url_extractor = lambda parser, category: []
         # Set this to False if you want to recompute the categories
         # *every* time you build a `Source` object
         # TODO: Actually make this work
