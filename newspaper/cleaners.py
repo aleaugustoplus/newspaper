@@ -125,10 +125,10 @@ class DocumentCleaner(object):
             if not node.xpath(self.contains_article):
                 self.parser.remove(node)
         # class
-        naughty_classes = self.parser.xpath_re(doc, self.nauthy_classes_re)
-        for node in naughty_classes:
-            if not node.xpath(self.contains_article):
-                self.parser.remove(node)
+        # naughty_classes = self.parser.xpath_re(doc, self.nauthy_classes_re)
+        # for node in naughty_classes:
+        #     if not node.xpath(self.contains_article):
+        #         self.parser.remove(node)
         # name
         naughty_names = self.parser.xpath_re(doc, self.nauthy_names_re)
         for node in naughty_names:
