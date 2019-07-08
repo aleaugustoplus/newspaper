@@ -248,7 +248,8 @@ class ContentExtractor(object):
             publish_date = parsed_article.find("time")
             if publish_date:
                 publish_date = publish_date.get("datetime")
-                publish_date = date_parser(publish_date)
+                if publish_date:
+                    publish_date = date_parser(publish_date)
                 if publish_date:
                     return publish_date
 
@@ -639,7 +640,8 @@ class ContentExtractor(object):
             items = parsed_doc.find_all('item')
             links = []
             for item in items:
-                links.append(item.find('link').string)
+                if item.find('link'):
+                    links.append(item.find('link').string)
 
             doc_or_html = re.sub('<[^<]+?>', ' ', str(doc_or_html))
             doc_or_html = re.findall(
