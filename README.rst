@@ -1,3 +1,11 @@
+Customized version of Newspaper3k
+========================================
+
+This is a special version of the newspaper3k library, it is used for: https://gendergaptracker.informedopinions.org, while it does a lot of work we found that we could improve some points to increase the accuracy and performance by customizing few points specifically to the outlets targeted on our data collection
+
+We have also changed the tagging naming convention to follow the one we use on the release of the code mentioned before
+
+
 Newspaper3k: Article scraping & curation
 ========================================
 
