@@ -253,6 +253,13 @@ class ContentExtractor(object):
                 if publish_date:
                     return publish_date
 
+            # Global News
+            m = re.search('\"datePublished\"\:\"(.*)\"', html)
+            if m:
+                publish_date = m.group(1)
+                if publish_date:
+                    return date_parser(publish_date)
+
         return None
 
     def get_title(self, doc):
