@@ -260,6 +260,15 @@ class ContentExtractor(object):
                 if publish_date:
                     return date_parser(publish_date)
 
+            # National Post
+            parsed_article = BeautifulSoup(html, 'lxml-xml')
+            publish_date = parsed_article.find("span", {"class": "published-date__since"})
+            if publish_date:
+                publish_date = publish_date.text
+                publish_date = date_parser(publish_date)
+                publish_date = date_parser(publish_date)
+                if publish_date:
+                    return publish_date
         return None
 
     def get_title(self, doc):
