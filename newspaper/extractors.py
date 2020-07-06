@@ -266,7 +266,6 @@ class ContentExtractor(object):
             if publish_date:
                 publish_date = publish_date.text
                 publish_date = date_parser(publish_date)
-                publish_date = date_parser(publish_date)
                 if publish_date:
                     return publish_date
         return None
