@@ -29,11 +29,16 @@ class DocumentCleaner(object):
             "|konafilter|KonaFilter|breadcrumbs|^fn$|wp-caption-text"
             "|legende|ajoutVideo|timestamp|js_replies"
         )
+
+        self.remove_nodes_class_re = (
+            "visually-hidden|video-fallback"
+        )
+
         self.regexp_namespace = "http://exslt.org/regular-expressions"
         self.nauthy_ids_re = ("//*[re:test(@id, '%s', 'i')]" %
                               self.remove_nodes_re)
         self.nauthy_classes_re = ("//*[re:test(@class, '%s', 'i')]" %
-                                  self.remove_nodes_re)
+                                  self.remove_nodes_class_re)
         self.nauthy_names_re = ("//*[re:test(@name, '%s', 'i')]" %
                                 self.remove_nodes_re)
         self.div_to_p_re = r"<(a|blockquote|dl|div|img|ol|p|pre|table|ul)"
@@ -125,10 +130,10 @@ class DocumentCleaner(object):
             if not node.xpath(self.contains_article):
                 self.parser.remove(node)
         # class
-        # naughty_classes = self.parser.xpath_re(doc, self.nauthy_classes_re)
-        # for node in naughty_classes:
-        #     if not node.xpath(self.contains_article):
-        #         self.parser.remove(node)
+        naughty_classes = self.parser.xpath_re(doc, self.nauthy_classes_re)
+        for node in naughty_classes:
+            if not node.xpath(self.contains_article):
+                self.parser.remove(node)
         # name
         naughty_names = self.parser.xpath_re(doc, self.nauthy_names_re)
         for node in naughty_names:
