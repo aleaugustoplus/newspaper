@@ -272,6 +272,16 @@ class Article(object):
 
         self.top_node = self.extractor.calculate_best_node(self.doc)
         if self.top_node is not None:
+            if self.top_node.tag == 'section':
+                if self.top_node.getparent().tag == 'div':
+                    similar_nodes = self.extractor.parser.getElementsByTag(self.doc,
+                                                                           self.top_node.tag,
+                                                                           attr='class',
+                                                                           value=self.top_node.get('class'))
+                    similar_nodes = [s for s in similar_nodes if s != self.top_node]
+                    for node in similar_nodes:
+                        self.top_node.insert(-1, node)
+
             video_extractor = VideoExtractor(self.config, self.top_node)
             self.set_movies(video_extractor.get_videos())
 

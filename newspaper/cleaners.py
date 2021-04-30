@@ -27,11 +27,12 @@ class DocumentCleaner(object):
             "|communitypromo|runaroundLeft|subscribe|vcard|articleheadings"
             "|date|^print$|popup|author-dropdown|tools|socialtools|byline"
             "|konafilter|KonaFilter|breadcrumbs|^fn$|wp-caption-text"
-            "|legende|ajoutVideo|timestamp|js_replies"
+            "|legende|ajoutVideo|timestamp|js_replies|articleImage"
         )
 
         self.remove_nodes_class_re = (
-            "visually-hidden|video-fallback"
+            "visually-hidden|video-fallback|newsletter-widget|ad__placeholder|"
+            "polopoly_embed|ad__label|widget-title|sr-only"
         )
 
         self.regexp_namespace = "http://exslt.org/regular-expressions"

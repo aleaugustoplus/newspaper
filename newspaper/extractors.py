@@ -920,12 +920,21 @@ class ContentExtractor(object):
 
     def add_siblings(self, top_node):
         baseline_score_siblings_para = self.get_siblings_score(top_node)
-        results = self.walk_siblings(top_node)
-        for current_node in results:
+        # Adds previous siblings
+        previous_sibs = self.walk_siblings(top_node)
+        for current_node in previous_sibs:
             ps = self.get_siblings_content(
                 current_node, baseline_score_siblings_para)
             for p in ps:
                 top_node.insert(0, p)
+
+        # Add following siblings
+        following_sibs = [n for n in top_node.itersiblings()]
+        for current_node in following_sibs:
+            ps = self.get_siblings_content(current_node, baseline_score_siblings_para)
+            for p in ps:
+                top_node.append(p)
+
         return top_node
 
     def get_siblings_content(
