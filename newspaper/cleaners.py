@@ -27,11 +27,13 @@ class DocumentCleaner(object):
             "|communitypromo|runaroundLeft|subscribe|vcard|articleheadings"
             "|date|^print$|popup|author-dropdown|tools|socialtools|byline"
             "|konafilter|KonaFilter|breadcrumbs|^fn$|wp-caption-text"
-            "|legende|ajoutVideo|timestamp|js_replies"
+            "|legende|ajoutVideo|timestamp|js_replies|articleImage"
         )
 
         self.remove_nodes_class_re = (
-            "visually-hidden|video-fallback"
+            "visually-hidden|video-fallback|newsletter-widget|ad__placeholder|"
+            "polopoly_embed|ad__label|widget-title|sr-only|"
+            "share-button__wrapper|breadcrumbs|^more-topic$"
         )
 
         self.regexp_namespace = "http://exslt.org/regular-expressions"
@@ -53,6 +55,9 @@ class DocumentCleaner(object):
             .append("\t")\
             .append("^\\s+$")
         self.contains_article = './/article|.//*[@id="article"]|.//*[@itemprop="articleBody"]'
+        self.image_credit_re = '^credit|[^r][-_]credit|^distributor'
+        self.article_metadata_re = '^article-meta'
+        self.video_fallback_re = '^embed-height|^direct-embed-video|player-wrapper'
 
     def clean(self, doc_to_clean):
         """Remove chunks of the DOM as specified
@@ -70,6 +75,9 @@ class DocumentCleaner(object):
         doc_to_clean = self.remove_nodes_regex(doc_to_clean,
                                                self.facebook_broadcasting_re)
         doc_to_clean = self.remove_nodes_regex(doc_to_clean, self.twitter_re)
+        doc_to_clean = self.remove_nodes_regex(doc_to_clean, self.image_credit_re)
+        doc_to_clean = self.remove_nodes_regex(doc_to_clean, self.article_metadata_re)
+        doc_to_clean = self.remove_nodes_regex(doc_to_clean, self.video_fallback_re)
         doc_to_clean = self.clean_para_spans(doc_to_clean)
         doc_to_clean = self.div_to_para(doc_to_clean, 'div')
         doc_to_clean = self.div_to_para(doc_to_clean, 'span')
