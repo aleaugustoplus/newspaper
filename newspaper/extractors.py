@@ -19,6 +19,7 @@ from collections import defaultdict
 from bs4 import BeautifulSoup
 
 from dateutil.parser import parse as date_parser
+from dateutil.parser import ParserError
 from tldextract import tldextract
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -185,6 +186,11 @@ class ContentExtractor(object):
             if date_str:
                 try:
                     return date_parser(date_str)
+                except ParserError:
+                    # Adding exception to try fuzzy matching only if strict matching doesn't work.
+                    # Instigated by errors w/ RadioCanada date format
+                    # e.g. "Fri Oct 01 2021 21:36:43 GMT+0000 (Coordinated Universal Time)"
+                    return date_parser(date_str, fuzzy=True)
                 except (ValueError, OverflowError, AttributeError, TypeError):
                     # near all parse failures are due to URL dates without a day
                     # specifier, e.g. /2014/04/
@@ -239,7 +245,7 @@ class ContentExtractor(object):
             publish_date = parsed_article.find("time", {"class": "timeStamp"})
             if publish_date:
                 publish_date = publish_date.get("dateTime")
-                publish_date = date_parser(publish_date)
+                publish_date = parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
 
@@ -249,7 +255,7 @@ class ContentExtractor(object):
             if publish_date:
                 publish_date = publish_date.get("datetime")
                 if publish_date:
-                    publish_date = date_parser(publish_date)
+                    publish_date = parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
 
@@ -258,14 +264,14 @@ class ContentExtractor(object):
             if m:
                 publish_date = m.group(1)
                 if publish_date:
-                    return date_parser(publish_date)
+                    return parse_date_str(publish_date)
 
             # National Post
             parsed_article = BeautifulSoup(html, 'lxml-xml')
             publish_date = parsed_article.find("span", {"class": "published-date__since"})
             if publish_date:
                 publish_date = publish_date.text
-                publish_date = date_parser(publish_date)
+                publish_date = parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
         return None
