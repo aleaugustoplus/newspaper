@@ -279,6 +279,8 @@ class Article(object):
                                                                            attr='class',
                                                                            value=self.top_node.get('class'))
                     similar_nodes = [s for s in similar_nodes if s != self.top_node]
+                    similar_nodes = [s for s in similar_nodes
+                                     if s.text_content().strip() != self.top_node.text_content().strip()]
                     for node in similar_nodes:
                         self.top_node.insert(-1, node)
 
