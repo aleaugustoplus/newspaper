@@ -20,7 +20,7 @@ from . import urls
 
 from .cleaners import DocumentCleaner
 from .configuration import Configuration
-from .extractors import ContentExtractor
+from .extractors import ContentExtractor, LeDroitContentExtractor
 from .outputformatters import OutputFormatter
 from .utils import (URLHelper, RawHelper, extend_config,
                     get_available_languages, extract_meta_refresh)
@@ -55,7 +55,7 @@ class Article(object):
         self.config = config or Configuration()
         self.config = extend_config(self.config, kwargs)
 
-        self.extractor = ContentExtractor(self.config)
+        self.extractor = self.config.extractor(self.config)
 
         if source_url == '':
             scheme = urls.get_scheme(url)
@@ -270,7 +270,11 @@ class Article(object):
         # Before any computations on the body, clean DOM object
         self.doc = document_cleaner.clean(self.doc)
 
-        self.top_node = self.extractor.calculate_best_node(self.doc)
+        if isinstance(self.extractor, LeDroitContentExtractor):
+            self.top_node = self.extractor.calculate_best_node(self.html)
+        else:
+            self.top_node = self.extractor.calculate_best_node(self.doc)
+
         if self.top_node is not None:
             if self.top_node.tag == 'section':
                 if self.top_node.getparent().tag == 'div':

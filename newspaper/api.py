@@ -80,7 +80,7 @@ def fulltext(html, language='en'):
     config = Configuration()
     config.language = language
 
-    extractor = ContentExtractor(config)
+    extractor = config.extractor(config)
     document_cleaner = DocumentCleaner(config)
     output_formatter = OutputFormatter(config)
 
