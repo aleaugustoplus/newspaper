@@ -26,6 +26,9 @@ from urllib.parse import urljoin, urlparse, urlunparse
 from . import urls
 from .utils import StringReplacement, StringSplitter
 
+import json
+from newspaper.parsers import Parser
+from lxml.html import HtmlElement
 
 log = logging.getLogger(__name__)
 
@@ -225,7 +228,9 @@ class ContentExtractor(object):
             {'attribute': 'pubdate', 'value': 'pubdate',
              'content': 'datetime'},
             {'attribute': 'datetime', 'value': 'pubdate',
-             'content': 'datetime'}
+             'content': 'datetime'},
+            {'attribute': 'name', 'value': 'dc.date.created',
+             'content': 'content'}
         ]
         for known_meta_tag in PUBLISH_DATE_TAGS:
             meta_tags = self.parser.getElementsByTag(
@@ -823,6 +828,7 @@ class ContentExtractor(object):
         return set(tags)
 
     def calculate_best_node(self, doc):
+        print("ContentExtractor")
         top_node = None
         nodes_to_check = self.nodes_to_check(doc)
         starting_boost = float(1.0)
@@ -1112,3 +1118,21 @@ class ContentExtractor(object):
                 if self.is_highlink_density(e):
                     self.parser.remove(e)
         return node
+
+
+class LeDroitContentExtractor(ContentExtractor):
+    def calculate_best_node(self, html):
+        html_element = Parser().fromstring(html)
+        script_contents = html_element.get_element_by_id('shoebox-content-items').text
+        top_node = HtmlElement()
+        for k, v in json.loads(script_contents).items():
+            data = json.loads(v)
+            chapters = data['chapters']
+            for i, chapter in enumerate(chapters):
+                if 'text' in chapter:
+                    text_element = Parser().fromstring(chapter['text'])
+                    text_element.attrib['class'] = 'le-droit-content'
+                    top_node.insert(i, text_element)
+            top_node.insert(-1, HtmlElement())
+
+        return top_node

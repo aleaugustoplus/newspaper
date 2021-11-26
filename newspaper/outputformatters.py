@@ -145,7 +145,7 @@ class OutputFormatter(object):
         last top level node's class is one of NON_MEDIA_CLASSES.
         """
 
-        NON_MEDIA_CLASSES = ('zn-body__read-all', 'content-list-component text')
+        NON_MEDIA_CLASSES = ('zn-body__read-all', 'content-list-component text', 'le-droit-content')
 
         def get_depth(node, depth=1):
             """Computes depth of an lxml element via BFS, this would be

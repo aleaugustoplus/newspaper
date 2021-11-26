@@ -18,7 +18,7 @@ from . import urls
 from . import utils
 from .article import Article
 from .configuration import Configuration
-from .extractors import ContentExtractor
+from .extractors import ContentExtractor, LeDroitContentExtractor
 from .settings import ANCHOR_DIRECTORY
 
 log = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class Source(object):
         self.config = config or Configuration()
         self.config = utils.extend_config(self.config, kwargs)
 
-        self.extractor = ContentExtractor(self.config)
+        self.extractor = self.config.extractor(self.config)
 
         self.url = url
         self.url = urls.prepare_url(url)

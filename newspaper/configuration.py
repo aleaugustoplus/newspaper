@@ -16,6 +16,7 @@ from .parsers import Parser
 from .text import (StopWords, StopWordsArabic, StopWordsChinese,
                    StopWordsKorean, StopWordsHindi, StopWordsJapanese)
 from .version import __version__
+from .extractors import ContentExtractor
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +80,8 @@ class Configuration(object):
         # *every* time you build a `Source` object
         # TODO: Actually make this work
         # self.use_cached_categories = True
+
+        self.extractor = ContentExtractor
 
     def get_language(self):
         return self._language
