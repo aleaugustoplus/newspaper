@@ -260,7 +260,7 @@ class ContentExtractor(object):
                     return publish_date
 
             # Global News
-            m = re.search('\"datePublished\"\:\"(.*)\"', html)
+            m = re.search('\"datePublished\"\:\"(.*?)\"', html)
             if m:
                 publish_date = m.group(1)
                 if publish_date:
