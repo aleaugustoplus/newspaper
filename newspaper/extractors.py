@@ -1136,3 +1136,77 @@ class LeDroitContentExtractor(ContentExtractor):
             top_node.insert(-1, HtmlElement())
 
         return top_node
+
+
+class RadioCanadaContentExtractor(ContentExtractor):
+    def get_publishing_date(self, url, doc, html=""):
+        """3 strategies for publishing date extraction. The strategies
+        are descending in accuracy and the next strategy is only
+        attempted if a preferred one fails.
+
+        1. Pubdate from URL
+        2. Pubdate from metadata
+        3. Raw regex searches in the HTML + added heuristics
+        """
+
+        def parse_date_str(date_str):
+            if date_str:
+                try:
+                    return date_parser(date_str)
+                except ParserError:
+                    # Adding exception to try fuzzy matching only if strict matching doesn't work.
+                    # Instigated by errors w/ RadioCanada date format
+                    # e.g. "Fri Oct 01 2021 21:36:43 GMT+0000 (Coordinated Universal Time)"
+                    return date_parser(date_str, fuzzy=True)
+                except (ValueError, OverflowError, AttributeError, TypeError):
+                    # near all parse failures are due to URL dates without a day
+                    # specifier, e.g. /2014/04/
+                    return None
+
+        # date_match = re.search(urls.STRICT_DATE_REGEX, url)
+        # if date_match:
+        #     date_str = date_match.group(0)
+        #     datetime_obj = parse_date_str(date_str)
+        #     if datetime_obj:
+        #         return datetime_obj
+
+        PUBLISH_DATE_TAGS = [
+            {'attribute': 'property', 'value': 'rnews:datePublished',
+             'content': 'content'},
+            {'attribute': 'property', 'value': 'article:published_time',
+             'content': 'content'},
+            {'attribute': 'name', 'value': 'OriginalPublicationDate',
+             'content': 'content'},
+            {'attribute': 'itemprop', 'value': 'datePublished',
+             'content': 'datetime'},
+            {'attribute': 'property', 'value': 'og:published_time',
+             'content': 'content'},
+            {'attribute': 'name', 'value': 'article_date_original',
+             'content': 'content'},
+            {'attribute': 'name', 'value': 'publication_date',
+             'content': 'content'},
+            {'attribute': 'name', 'value': 'sailthru.date',
+             'content': 'content'},
+            {'attribute': 'name', 'value': 'PublishDate',
+             'content': 'content'},
+            {'attribute': 'pubdate', 'value': 'pubdate',
+             'content': 'datetime'},
+            {'attribute': 'datetime', 'value': 'pubdate',
+             'content': 'datetime'},
+            {'attribute': 'name', 'value': 'dc.date.created',
+             'content': 'content'}
+        ]
+        for known_meta_tag in PUBLISH_DATE_TAGS:
+            meta_tags = self.parser.getElementsByTag(
+                doc,
+                attr=known_meta_tag['attribute'],
+                value=known_meta_tag['value'])
+            if meta_tags:
+                date_str = self.parser.getAttribute(
+                    meta_tags[0],
+                    known_meta_tag['content'])
+                datetime_obj = parse_date_str(date_str)
+                if datetime_obj:
+                    return datetime_obj
+
+        return None
