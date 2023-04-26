@@ -33,7 +33,7 @@ class DocumentCleaner(object):
         self.remove_nodes_class_re = (
             "visually-hidden|video-fallback|newsletter-widget|ad__placeholder|"
             "polopoly_embed|ad__label|widget-title|sr-only|"
-            "share-button__wrapper|breadcrumbs|^more-topic$"
+            "share-button__wrapper|breadcrumbs|^more-topic$|article-block"
         )
 
         self.regexp_namespace = "http://exslt.org/regular-expressions"

@@ -828,7 +828,6 @@ class ContentExtractor(object):
         return set(tags)
 
     def calculate_best_node(self, doc):
-        print("ContentExtractor")
         top_node = None
         nodes_to_check = self.nodes_to_check(doc)
         starting_boost = float(1.0)
