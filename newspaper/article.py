@@ -56,6 +56,7 @@ class Article(object):
         self.config = extend_config(self.config, kwargs)
 
         self.extractor = self.config.extractor(self.config)
+        self.document_cleaner = self.config.document_cleaner(self.config)
 
         if source_url == '':
             scheme = urls.get_scheme(url)
@@ -223,7 +224,7 @@ class Article(object):
         parse_candidate = self.get_parse_candidate()
         self.link_hash = parse_candidate.link_hash  # MD5
 
-        document_cleaner = DocumentCleaner(self.config)
+        document_cleaner = self.document_cleaner
         output_formatter = OutputFormatter(self.config)
 
         title = self.extractor.get_title(self.clean_doc)
