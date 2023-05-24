@@ -253,3 +253,21 @@ class DocumentCleaner(object):
                     div.set(name, value)
                 else_divs += 1
         return doc
+
+
+class NationalPostCleaner(DocumentCleaner):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.remove_nodes_re += "|disclaimer"
+
+        self.remove_nodes_class_re += \
+            "|article-block|article-card__details|consent__banner|header-breaking__wrapper" \
+            "|author-info|article-content__ad-group"
+
+        self.nauthy_ids_re = ("//*[re:test(@id, '%s', 'i')]" %
+                              (self.remove_nodes_re + '|^relatedStories'))
+        self.nauthy_classes_re = ("//*[re:test(@class, '%s', 'i')]" %
+                                  self.remove_nodes_class_re)
+        self.nauthy_names_re = ("//*[re:test(@name, '%s', 'i')]" %
+                                self.remove_nodes_re)

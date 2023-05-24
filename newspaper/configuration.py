@@ -17,6 +17,7 @@ from .text import (StopWords, StopWordsArabic, StopWordsChinese,
                    StopWordsKorean, StopWordsHindi, StopWordsJapanese)
 from .version import __version__
 from .extractors import ContentExtractor
+from .cleaners import DocumentCleaner
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +83,7 @@ class Configuration(object):
         # self.use_cached_categories = True
 
         self.extractor = ContentExtractor
+        self.document_cleaner = DocumentCleaner
 
     def get_language(self):
         return self._language

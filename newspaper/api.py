@@ -81,7 +81,7 @@ def fulltext(html, language='en'):
     config.language = language
 
     extractor = config.extractor(config)
-    document_cleaner = DocumentCleaner(config)
+    document_cleaner = config.document_cleaner(config)
     output_formatter = OutputFormatter(config)
 
     doc = config.get_parser().fromstring(html)
