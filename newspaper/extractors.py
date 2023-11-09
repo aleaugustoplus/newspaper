@@ -1209,3 +1209,35 @@ class RadioCanadaContentExtractor(ContentExtractor):
                     return datetime_obj
 
         return None
+
+
+
+class NationalPostContentExtractor(ContentExtractor):
+    def get_publishing_date(self, url, doc, html=""):
+        def parse_date_str(date_str):
+            if date_str:
+                try:
+                    return date_parser(date_str)
+                except ParserError:
+                    # Adding exception to try fuzzy matching only if strict matching doesn't work.
+                    # Instigated by errors w/ RadioCanada date format
+                    # e.g. "Fri Oct 01 2021 21:36:43 GMT+0000 (Coordinated Universal Time)"
+                    return date_parser(date_str, fuzzy=True)
+                except (ValueError, OverflowError, AttributeError, TypeError):
+                    # near all parse failures are due to URL dates without a day
+                    # specifier, e.g. /2014/04/
+                    return None
+
+        known_tags = [
+            ('span', {"class": "published-date__since"}),
+            ('div', {"class": "published-date"})
+        ]
+
+        parsed_article = BeautifulSoup(html, 'html.parser')
+        for tag, attrs in known_tags:
+            publish_date = parsed_article.find(tag, attrs)
+            if publish_date:
+                publish_date = publish_date.text
+                publish_date = parse_date_str(publish_date)
+                if publish_date:
+                    return publish_date
