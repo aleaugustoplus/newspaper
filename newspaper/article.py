@@ -20,7 +20,7 @@ from . import urls
 
 from .cleaners import DocumentCleaner
 from .configuration import Configuration
-from .extractors import ContentExtractor, LeDroitContentExtractor
+from .extractors import ContentExtractor, LeDroitContentExtractor, NationalPostContentExtractor
 from .outputformatters import OutputFormatter
 from .utils import (URLHelper, RawHelper, extend_config,
                     get_available_languages, extract_meta_refresh)
