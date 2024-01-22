@@ -271,3 +271,13 @@ class NationalPostCleaner(DocumentCleaner):
                                   self.remove_nodes_class_re)
         self.nauthy_names_re = ("//*[re:test(@name, '%s', 'i')]" %
                                 self.remove_nodes_re)
+
+
+class TheStarCleaner(DocumentCleaner):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.remove_nodes_class_re += "|modal\-"
+
+        self.nauthy_classes_re = ("//*[re:test(@class, '%s', 'i')]" %
+                                  self.remove_nodes_class_re)
