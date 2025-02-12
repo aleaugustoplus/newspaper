@@ -20,7 +20,7 @@ from . import urls
 
 from .cleaners import DocumentCleaner
 from .configuration import Configuration
-from .extractors import ContentExtractor, LeDroitContentExtractor, NationalPostContentExtractor
+from .extractors import ContentExtractor, LeDroitContentExtractor, NationalPostContentExtractor, CTVNewsContentExtractor
 from .outputformatters import OutputFormatter
 from .utils import (URLHelper, RawHelper, extend_config,
                     get_available_languages, extract_meta_refresh)
@@ -271,7 +271,7 @@ class Article(object):
         # Before any computations on the body, clean DOM object
         self.doc = document_cleaner.clean(self.doc)
 
-        if isinstance(self.extractor, LeDroitContentExtractor):
+        if isinstance(self.extractor, LeDroitContentExtractor) or isinstance(self.extractor, CTVNewsContentExtractor):
             self.top_node = self.extractor.calculate_best_node(self.html)
         else:
             self.top_node = self.extractor.calculate_best_node(self.doc)

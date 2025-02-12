@@ -28,7 +28,7 @@ from .utils import StringReplacement, StringSplitter
 
 import json
 from newspaper.parsers import Parser
-from lxml.html import HtmlElement
+from lxml.html import HtmlElement, builder
 
 log = logging.getLogger(__name__)
 
@@ -1241,3 +1241,157 @@ class NationalPostContentExtractor(ContentExtractor):
                 publish_date = parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
+
+
+class CTVNewsContentExtractor(ContentExtractor):
+    def get_category_urls(self, source_url, doc):
+        """Inputs source lxml root and source url, extracts domain and
+        finds all of the top level urls, we are assuming that these are
+        the category urls.
+        cnn.com --> [cnn.com/latest, world.cnn.com, cnn.com/asia]
+        """
+        page_urls = self.get_urls(doc)
+        valid_categories = []
+        for p_url in page_urls:
+            scheme = urls.get_scheme(p_url, allow_fragments=False)
+            domain = urls.get_domain(p_url, allow_fragments=False)
+            path = urls.get_path(p_url, allow_fragments=False)
+
+            if not domain and not path:
+                if self.config.verbose:
+                    print('elim category url %s for no domain and path'
+                          % p_url)
+                continue
+            if path and path.startswith('#'):
+                if self.config.verbose:
+                    print('elim category url %s path starts with #' % p_url)
+                continue
+            if scheme and (scheme != 'http' and scheme != 'https'):
+                if self.config.verbose:
+                    print(('elim category url %s for bad scheme, '
+                           'not http nor https' % p_url))
+                continue
+
+            if domain:
+                child_tld = tldextract.extract(p_url)
+                domain_tld = tldextract.extract(source_url)
+                child_subdomain_parts = child_tld.subdomain.split('.')
+                subdomain_contains = False
+                for part in child_subdomain_parts:
+                    if part == domain_tld.domain:
+                        if self.config.verbose:
+                            print(('subdomain contains at %s and %s' %
+                                   (str(part), str(domain_tld.domain))))
+                        subdomain_contains = True
+                        break
+
+                # Ex. microsoft.com is definitely not related to
+                # espn.com, but espn.go.com is probably related to espn.com
+                if not subdomain_contains and \
+                        (child_tld.domain != domain_tld.domain):
+                    if self.config.verbose:
+                        print(('elim category url %s for domain '
+                               'mismatch' % p_url))
+                        continue
+                elif child_tld.subdomain in ['m', 'i']:
+                    if self.config.verbose:
+                        print(('elim category url %s for mobile '
+                               'subdomain' % p_url))
+                    continue
+                else:
+                    valid_categories.append(scheme + '://' + domain)
+                    # TODO account for case where category is in form
+                    # http://subdomain.domain.tld/category/ <-- still legal!
+            else:
+                # we want a path with just one subdir
+                # cnn.com/world and cnn.com/world/ are both valid_categories
+                path_chunks = [x for x in path.split('/') if len(x) > 0]
+                if 'index.html' in path_chunks:
+                    path_chunks.remove('index.html')
+
+                if 'article' in path_chunks:
+                    valid_categories.append(domain+'/'+'/'.join(path_chunks[0:path_chunks.index('article')]))
+
+                elif len(path_chunks) >= 1 and len(path_chunks) <= 5 and len(path_chunks[0]) < 14:
+                    valid_categories.append(domain + path)
+                else:
+                    if self.config.verbose:
+                        print(('elim category url %s for >1 path chunks '
+                               'or size path chunks' % p_url))
+
+        stopwords = [
+            'about', 'help', 'privacy', 'legal', 'feedback', 'sitemap',
+            'profile', 'account', 'mobile', 'sitemap', 'facebook', 'myspace',
+            'twitter', 'linkedin', 'bebo', 'friendster', 'stumbleupon',
+            'youtube', 'vimeo', 'store', 'mail', 'preferences', 'maps',
+            'password', 'imgur', 'flickr', 'search', 'subscription', 'itunes',
+            'siteindex', 'events', 'stop', 'jobs', 'careers', 'newsletter',
+            'subscribe', 'academy', 'shopping', 'purchase', 'site-map',
+            'shop', 'donate', 'newsletter', 'product', 'advert', 'info',
+            'tickets', 'coupons', 'forum', 'board', 'archive', 'browse',
+            'howto', 'how to', 'faq', 'terms', 'charts', 'services',
+            'contact', 'plus', 'admin', 'login', 'signup', 'register',
+            'developer', 'proxy']
+
+        _valid_categories = []
+
+        # TODO Stop spamming urlparse and tldextract calls...
+
+        for p_url in valid_categories:
+            path = urls.get_path(p_url)
+            subdomain = tldextract.extract(p_url).subdomain
+            conjunction = path + ' ' + subdomain
+            bad = False
+            for badword in stopwords:
+                if badword.lower() in conjunction.lower():
+                    if self.config.verbose:
+                        print(('elim category url %s for subdomain '
+                               'contain stopword!' % p_url))
+                    bad = True
+                    break
+            if not bad:
+                _valid_categories.append(p_url)
+
+        _valid_categories.append('/')  # add the root
+
+        for i, p_url in enumerate(_valid_categories):
+            if p_url.startswith('://'):
+                p_url = 'http' + p_url
+                _valid_categories[i] = p_url
+
+            elif p_url.startswith('//'):
+                p_url = 'http:' + p_url
+                _valid_categories[i] = p_url
+
+            if p_url.endswith('/'):
+                p_url = p_url[:-1]
+                _valid_categories[i] = p_url
+
+        _valid_categories = list(set(_valid_categories))
+
+        category_urls = [urls.prepare_url(p_url, source_url)
+                         for p_url in _valid_categories]
+        category_urls = [c for c in category_urls if c is not None]
+        category_urls = list(set(category_urls))
+
+        return category_urls
+
+    def calculate_best_node(self, html):
+            html_element = Parser().fromstring(html)
+            script_contents = html_element.get_element_by_id('fusion-metadata').text
+            pattern = re.compile('Fusion\.globalContent=(.*?);F')
+            search_result = pattern.search(script_contents)
+            top_node = HtmlElement()
+            data = json.loads(search_result.groups()[0])
+
+            if 'content_elements' not in data:
+                return top_node
+
+            paragraphs = []
+            for x in data['content_elements']:
+                if 'content' not in x:
+                    continue
+                paragraphs.append(builder.P(x['content']))
+            top_node.extend(paragraphs)
+
+            return top_node
