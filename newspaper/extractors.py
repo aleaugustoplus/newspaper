@@ -1229,19 +1229,35 @@ class NationalPostContentExtractor(ContentExtractor):
                     return None
 
         known_tags = [
-            ('span', {"class": "published-date__since"}),
-            ('div', {"class": "published-date"})
+            ('script', {"type": "application/ld+json"}, lambda x: json.loads(x.text)['datePublished']),
+            ('span', {"class": "published-date__since"}, None),
+            ('div', {"class": "published-date"}, None)
         ]
 
         parsed_article = BeautifulSoup(html, 'html.parser')
-        for tag, attrs in known_tags:
+        for tag, attrs, accessor in known_tags:
             publish_date = parsed_article.find(tag, attrs)
             if publish_date:
-                publish_date = publish_date.text
+                if accessor:
+                    try:
+                        publish_date = accessor(publish_date)
+                    except:
+                        continue
+                else:
+                    publish_date = publish_date.text
                 publish_date = parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
 
+    def nodes_to_check(self, doc):
+        """Returns a list of nodes we want to search
+        on like paragraphs and tables
+        """
+        nodes_to_check = []
+        for tag in ['section']:
+            items = self.parser.getElementsByTag(doc, tag="div", attr="class", value="story-v2-content-element-inline")
+            nodes_to_check += items
+        return nodes_to_check
 
 class CTVNewsContentExtractor(ContentExtractor):
     def get_category_urls(self, source_url, doc):
