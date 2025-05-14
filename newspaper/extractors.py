@@ -1249,6 +1249,15 @@ class NationalPostContentExtractor(ContentExtractor):
                 if publish_date:
                     return publish_date
 
+    def nodes_to_check(self, doc):
+        """Returns a list of nodes we want to search
+        on like paragraphs and tables
+        """
+        nodes_to_check = []
+        for tag in ['section']:
+            items = self.parser.getElementsByTag(doc, tag="div", attr="class", value="story-v2-content-element-inline")
+            nodes_to_check += items
+        return nodes_to_check
 
 class CTVNewsContentExtractor(ContentExtractor):
     def get_category_urls(self, source_url, doc):
