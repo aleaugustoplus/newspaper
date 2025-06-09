@@ -271,7 +271,7 @@ class Article(object):
         # Before any computations on the body, clean DOM object
         self.doc = document_cleaner.clean(self.doc)
 
-        if isinstance(self.extractor, LeDroitContentExtractor) or isinstance(self.extractor, CTVNewsContentExtractor):
+        if isinstance(self.extractor, CTVNewsContentExtractor):
             self.top_node = self.extractor.calculate_best_node(self.html)
         else:
             self.top_node = self.extractor.calculate_best_node(self.doc)

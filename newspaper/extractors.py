@@ -1120,22 +1120,40 @@ class ContentExtractor(object):
 
 
 class LeDroitContentExtractor(ContentExtractor):
-    def calculate_best_node(self, html):
-        html_element = Parser().fromstring(html)
-        script_contents = html_element.get_element_by_id('shoebox-content-items').text
-        top_node = HtmlElement()
-        for k, v in json.loads(script_contents).items():
-            data = json.loads(v)
-            chapters = data['chapters']
-            for i, chapter in enumerate(chapters):
-                if 'text' in chapter:
-                    text_element = Parser().fromstring(chapter['text'])
-                    text_element.attrib['class'] = 'le-droit-content'
-                    top_node.insert(i, text_element)
-            top_node.insert(-1, HtmlElement())
-
-        return top_node
-
+    def get_siblings_content(self, current_sibling, baseline_score_siblings_para):
+        """Adds any siblings that may have a decent score to this node
+        """
+        if current_sibling.tag in ['p', 'h2'] and \
+                        len(self.parser.getText(current_sibling)) > 0:
+            e0 = current_sibling
+            if e0.tail:
+                e0 = copy.deepcopy(e0)
+                e0.tail = ''
+            return [e0]
+        else:
+            potential_paragraphs = self.parser.getElementsByTag(
+                current_sibling, tag='p')
+            if potential_paragraphs is None:
+                return None
+            else:
+                ps = []
+                for first_paragraph in potential_paragraphs:
+                    text = self.parser.getText(first_paragraph)
+                    if len(text) > 0:
+                        word_stats = self.stopwords_class(
+                            language=self.language). \
+                            get_stopword_count(text)
+                        paragraph_score = word_stats.get_stopword_count()
+                        sibling_baseline_score = float(.30)
+                        high_link_density = self.is_highlink_density(
+                            first_paragraph)
+                        score = float(baseline_score_siblings_para *
+                                      sibling_baseline_score)
+                        if score < paragraph_score and not high_link_density:
+                            p = self.parser.createElement(
+                                tag='p', text=text, tail=None)
+                            ps.append(p)
+                return ps
 
 class RadioCanadaContentExtractor(ContentExtractor):
     def get_publishing_date(self, url, doc, html=""):
@@ -1209,8 +1227,6 @@ class RadioCanadaContentExtractor(ContentExtractor):
                     return datetime_obj
 
         return None
-
-
 
 class NationalPostContentExtractor(ContentExtractor):
     def get_publishing_date(self, url, doc, html=""):
