@@ -6,29 +6,31 @@ https://github.com/codelucas/newspaper/blob/master/GOOSE-LICENSE.txt
 Keep all html page extraction code within this file. Abstract any
 lxml or soup parsing code in the parsers.py file!
 """
-__title__ = 'newspaper'
-__author__ = 'Lucas Ou-Yang'
-__license__ = 'MIT'
-__copyright__ = 'Copyright 2014, Lucas Ou-Yang'
+from __future__ import annotations
 
 import copy
+import json
 import logging
 import re
-import re
 from collections import defaultdict
-from bs4 import BeautifulSoup
-
-from dateutil.parser import parse as date_parser
-from dateutil.parser import ParserError
-from tldextract import tldextract
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
 from urllib.parse import urljoin, urlparse, urlunparse
+
+from bs4 import BeautifulSoup
+from dateutil.parser import ParserError, parse as date_parser
+from lxml.html import HtmlElement, builder
+from newspaper.parsers import Parser
+from tldextract import tldextract
 
 from . import urls
 from .utils import StringReplacement, StringSplitter
 
-import json
-from newspaper.parsers import Parser
-from lxml.html import HtmlElement, builder
+__title__ = 'newspaper'
+__author__ = 'Lucas Ou-Yang'
+__license__ = 'MIT'
+__copyright__ = 'Copyright 2014, Lucas Ou-Yang'
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +60,51 @@ bad_chunks = ['careers', 'contact', 'about', 'faq', 'terms', 'privacy',
 bad_domains = ['amazon', 'doubleclick', 'twitter']
 
 
+def _parse_date_str(date_str: str | None) -> Optional[datetime]:
+    """Best-effort parsing of date_str into a datetime object.
+
+    Returns
+    -------
+    datetime | None
+        When possible, a parsed datetime object. None if parsing fails.
+    """
+
+    if not date_str:
+        return None
+    try:
+        return date_parser(date_str)                 # strict ISO-like formats
+    except ParserError:
+        # Adding exception to try fuzzy matching only if strict matching doesn't work.
+        # Instigated by errors w/ RadioCanada date format
+        # e.g. "Fri Oct 01 2021 21:36:43 GMT+0000 (Coordinated Universal Time)"
+        try:
+            return date_parser(date_str, fuzzy=True)  # relaxed fallback
+        except (ValueError, OverflowError, AttributeError, TypeError):
+            # near all parse failures are due to URL dates without a day
+            # specifier, e.g. /2014/04/
+            return None
+
+@dataclass(frozen=True, slots=True)
+class MetaSpec:
+    attr:  str
+    value: str
+    content_key: str = "content"   # which attribute actually holds the date
+
 class ContentExtractor(object):
+    PUBLISH_DATE_META: tuple[MetaSpec, ...] = (
+        MetaSpec("property", "rnews:datePublished"),
+        MetaSpec("property", "article:published_time"),
+        MetaSpec("name", "OriginalPublicationDate"),
+        MetaSpec("property", "og:published_time"),
+        MetaSpec("name", "article_date_original"),
+        MetaSpec("name", "publication_date"),
+        MetaSpec("name", "sailthru.date"),
+        MetaSpec("name", "PublishDate"),
+        MetaSpec("name", "dc.date.created"),
+        MetaSpec("itemprop", "datePublished", "datetime"),
+        MetaSpec("pubdate", "pubdate", "datetime"),
+        MetaSpec("datetime", "pubdate", "datetime"),
+    )
     def __init__(self, config):
         self.config = config
         self.parser = self.config.get_parser()
@@ -184,73 +230,31 @@ class ContentExtractor(object):
         2. Pubdate from metadata
         3. Raw regex searches in the HTML + added heuristics
         """
-
-        def parse_date_str(date_str):
-            if date_str:
-                try:
-                    return date_parser(date_str)
-                except ParserError:
-                    # Adding exception to try fuzzy matching only if strict matching doesn't work.
-                    # Instigated by errors w/ RadioCanada date format
-                    # e.g. "Fri Oct 01 2021 21:36:43 GMT+0000 (Coordinated Universal Time)"
-                    return date_parser(date_str, fuzzy=True)
-                except (ValueError, OverflowError, AttributeError, TypeError):
-                    # near all parse failures are due to URL dates without a day
-                    # specifier, e.g. /2014/04/
-                    return None
-
         date_match = re.search(urls.STRICT_DATE_REGEX, url)
         if date_match:
             date_str = date_match.group(0)
-            datetime_obj = parse_date_str(date_str)
+            datetime_obj = _parse_date_str(date_str)
             if datetime_obj:
                 return datetime_obj
 
-        PUBLISH_DATE_TAGS = [
-            {'attribute': 'property', 'value': 'rnews:datePublished',
-             'content': 'content'},
-            {'attribute': 'property', 'value': 'article:published_time',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'OriginalPublicationDate',
-             'content': 'content'},
-            {'attribute': 'itemprop', 'value': 'datePublished',
-             'content': 'datetime'},
-            {'attribute': 'property', 'value': 'og:published_time',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'article_date_original',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'publication_date',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'sailthru.date',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'PublishDate',
-             'content': 'content'},
-            {'attribute': 'pubdate', 'value': 'pubdate',
-             'content': 'datetime'},
-            {'attribute': 'datetime', 'value': 'pubdate',
-             'content': 'datetime'},
-            {'attribute': 'name', 'value': 'dc.date.created',
-             'content': 'content'}
-        ]
-        for known_meta_tag in PUBLISH_DATE_TAGS:
+        for spec in self.PUBLISH_DATE_META:
             meta_tags = self.parser.getElementsByTag(
                 doc,
-                attr=known_meta_tag['attribute'],
-                value=known_meta_tag['value'])
+                attr=spec.attr,
+                value=spec.value)
             if meta_tags:
-                date_str = self.parser.getAttribute(
-                    meta_tags[0],
-                    known_meta_tag['content'])
-                datetime_obj = parse_date_str(date_str)
+                date_str = self.parser.getAttribute(meta_tags[0], spec.content_key)
+                datetime_obj = _parse_date_str(date_str)
                 if datetime_obj:
                     return datetime_obj
+
         if html:
             # CBC
             parsed_article = BeautifulSoup(html, 'lxml-xml')
             publish_date = parsed_article.find("time", {"class": "timeStamp"})
             if publish_date:
                 publish_date = publish_date.get("dateTime")
-                publish_date = parse_date_str(publish_date)
+                publish_date = _parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
 
@@ -260,7 +264,7 @@ class ContentExtractor(object):
             if publish_date:
                 publish_date = publish_date.get("datetime")
                 if publish_date:
-                    publish_date = parse_date_str(publish_date)
+                    publish_date = _parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
 
@@ -269,14 +273,14 @@ class ContentExtractor(object):
             if m:
                 publish_date = m.group(1)
                 if publish_date:
-                    return parse_date_str(publish_date)
+                    return _parse_date_str(publish_date)
 
             # National Post
             parsed_article = BeautifulSoup(html, 'lxml-xml')
             publish_date = parsed_article.find("span", {"class": "published-date__since"})
             if publish_date:
                 publish_date = publish_date.text
-                publish_date = parse_date_str(publish_date)
+                publish_date = _parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
         return None
@@ -1118,8 +1122,10 @@ class ContentExtractor(object):
                     self.parser.remove(e)
         return node
 
-
 class LeDroitContentExtractor(ContentExtractor):
+    PUBLISH_DATE_META = (
+        MetaSpec("data-testid", "custom-date", "datetime"),
+    )
     def get_siblings_content(self, current_sibling, baseline_score_siblings_para):
         """Adds any siblings that may have a decent score to this node
         """
@@ -1165,64 +1171,16 @@ class RadioCanadaContentExtractor(ContentExtractor):
         2. Pubdate from metadata
         3. Raw regex searches in the HTML + added heuristics
         """
-
-        def parse_date_str(date_str):
-            if date_str:
-                try:
-                    return date_parser(date_str)
-                except ParserError:
-                    # Adding exception to try fuzzy matching only if strict matching doesn't work.
-                    # Instigated by errors w/ RadioCanada date format
-                    # e.g. "Fri Oct 01 2021 21:36:43 GMT+0000 (Coordinated Universal Time)"
-                    return date_parser(date_str, fuzzy=True)
-                except (ValueError, OverflowError, AttributeError, TypeError):
-                    # near all parse failures are due to URL dates without a day
-                    # specifier, e.g. /2014/04/
-                    return None
-
-        # date_match = re.search(urls.STRICT_DATE_REGEX, url)
-        # if date_match:
-        #     date_str = date_match.group(0)
-        #     datetime_obj = parse_date_str(date_str)
-        #     if datetime_obj:
-        #         return datetime_obj
-
-        PUBLISH_DATE_TAGS = [
-            {'attribute': 'property', 'value': 'rnews:datePublished',
-             'content': 'content'},
-            {'attribute': 'property', 'value': 'article:published_time',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'OriginalPublicationDate',
-             'content': 'content'},
-            {'attribute': 'itemprop', 'value': 'datePublished',
-             'content': 'datetime'},
-            {'attribute': 'property', 'value': 'og:published_time',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'article_date_original',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'publication_date',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'sailthru.date',
-             'content': 'content'},
-            {'attribute': 'name', 'value': 'PublishDate',
-             'content': 'content'},
-            {'attribute': 'pubdate', 'value': 'pubdate',
-             'content': 'datetime'},
-            {'attribute': 'datetime', 'value': 'pubdate',
-             'content': 'datetime'},
-            {'attribute': 'name', 'value': 'dc.date.created',
-             'content': 'content'}
-        ]
-        for known_meta_tag in PUBLISH_DATE_TAGS:
+        for spec in self.PUBLISH_DATE_META:
             meta_tags = self.parser.getElementsByTag(
                 doc,
-                attr=known_meta_tag['attribute'],
-                value=known_meta_tag['value'])
+                attr=spec.attr,
+                value=spec.value)
             if meta_tags:
                 date_str = self.parser.getAttribute(
                     meta_tags[0],
-                    known_meta_tag['content'])
-                datetime_obj = parse_date_str(date_str)
+                    spec.content_key)
+                datetime_obj = _parse_date_str(date_str)
                 if datetime_obj:
                     return datetime_obj
 
@@ -1230,20 +1188,6 @@ class RadioCanadaContentExtractor(ContentExtractor):
 
 class NationalPostContentExtractor(ContentExtractor):
     def get_publishing_date(self, url, doc, html=""):
-        def parse_date_str(date_str):
-            if date_str:
-                try:
-                    return date_parser(date_str)
-                except ParserError:
-                    # Adding exception to try fuzzy matching only if strict matching doesn't work.
-                    # Instigated by errors w/ RadioCanada date format
-                    # e.g. "Fri Oct 01 2021 21:36:43 GMT+0000 (Coordinated Universal Time)"
-                    return date_parser(date_str, fuzzy=True)
-                except (ValueError, OverflowError, AttributeError, TypeError):
-                    # near all parse failures are due to URL dates without a day
-                    # specifier, e.g. /2014/04/
-                    return None
-
         known_tags = [
             ('script', {"type": "application/ld+json"}, lambda x: json.loads(x.text)['datePublished']),
             ('span', {"class": "published-date__since"}, None),
@@ -1261,7 +1205,7 @@ class NationalPostContentExtractor(ContentExtractor):
                         continue
                 else:
                     publish_date = publish_date.text
-                publish_date = parse_date_str(publish_date)
+                publish_date = _parse_date_str(publish_date)
                 if publish_date:
                     return publish_date
 
