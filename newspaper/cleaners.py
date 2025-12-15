@@ -281,3 +281,24 @@ class TheStarCleaner(DocumentCleaner):
 
         self.nauthy_classes_re = ("//*[re:test(@class, '%s', 'i')]" %
                                   self.remove_nodes_class_re)
+
+class LeDroitCleaner(DocumentCleaner):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.remove_nodes_class_re += "|custom\-copyrightstyled|author-bio"
+
+        self.nauthy_classes_re = ("//*[re:test(@class, '%s', 'i')]" %
+                                  self.remove_nodes_class_re)
+
+    def clean(self, doc_to_clean):
+        """Remove chunks of the DOM as specified
+        """
+        doc_to_clean = super().clean(doc_to_clean)
+        doc_to_clean = self.remove_tag(doc_to_clean, "figcaption")
+        return doc_to_clean
+
+    def remove_tag(self, doc, tag):
+        for node in doc.xpath(f'//{tag}'):
+            self.parser.remove(node)
+        return doc
