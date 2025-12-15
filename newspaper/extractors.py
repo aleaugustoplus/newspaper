@@ -17,9 +17,10 @@ import re
 import re
 from collections import defaultdict
 from bs4 import BeautifulSoup
-
-from dateutil.parser import parse as date_parser
 from dateutil.parser import ParserError
+from dateutil.parser import parse as date_parser
+from lxml.html import HtmlElement, builder, fragment_fromstring
+from newspaper.parsers import Parser
 from tldextract import tldextract
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -1211,7 +1212,6 @@ class RadioCanadaContentExtractor(ContentExtractor):
         return None
 
 
-
 class NationalPostContentExtractor(ContentExtractor):
     def get_publishing_date(self, url, doc, html=""):
         def parse_date_str(date_str):
@@ -1259,7 +1259,23 @@ class NationalPostContentExtractor(ContentExtractor):
             nodes_to_check += items
         return nodes_to_check
 
+
 class CTVNewsContentExtractor(ContentExtractor):
+    EXCLUDE_PHRASES = [
+        "download the ctv news app",
+        "sign up for breaking news alerts",
+        "get daily newsletters",
+    ]
+
+    _PROMO_HREF_RE = re.compile(r"ctvnews\.ca/(app|newsletters)", re.IGNORECASE)
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._phrases_re = re.compile(
+            "|".join(re.escape(p) for p in self.EXCLUDE_PHRASES),
+            re.IGNORECASE,
+        )
+        
     def get_category_urls(self, source_url, doc):
         """Inputs source lxml root and source url, extracts domain and
         finds all of the top level urls, we are assuming that these are
@@ -1393,21 +1409,72 @@ class CTVNewsContentExtractor(ContentExtractor):
         return category_urls
 
     def calculate_best_node(self, html):
-            html_element = Parser().fromstring(html)
-            script_contents = html_element.get_element_by_id('fusion-metadata').text
-            pattern = re.compile('Fusion\.globalContent=(.*?);F')
-            search_result = pattern.search(script_contents)
-            top_node = HtmlElement()
-            data = json.loads(search_result.groups()[0])
-
-            if 'content_elements' not in data:
-                return top_node
-
-            paragraphs = []
-            for x in data['content_elements']:
-                if 'content' not in x:
-                    continue
-                paragraphs.append(builder.P(x['content']))
-            top_node.extend(paragraphs)
-
+        html_element = Parser().fromstring(html)
+        script_contents = html_element.get_element_by_id("fusion-metadata").text
+        pattern = re.compile(r"Fusion\.globalContent=(.*?);F", re.DOTALL)
+        m = pattern.search(script_contents or "")
+        top_node = HtmlElement()
+        if not m:
             return top_node
+
+        data = json.loads(m.group(1))
+        if "content_elements" not in data:
+            return top_node
+
+        nodes = []
+        for x in data["content_elements"]:
+            x_type = x.get("type")
+
+            # --- NEW: structured lists ------------------------------------------
+            if x_type == "list":
+                tag = "ul" if x.get("list_type") == "unordered" else "ol"
+                li_html = "".join(
+                    f"<li>{item.get('content','')}</li>"
+                    for item in x.get("items", [])
+                    if isinstance(item, dict) and item.get("content")
+                )
+                html_list = f"<{tag}>{li_html}</{tag}>"
+                wrapper = fragment_fromstring(html_list, create_parent="div")
+                nodes.extend(list(wrapper))
+                continue
+
+            # --- Existing behavior ----------------------------------------------
+            content = x.get("content")
+            if not content:
+                continue
+            nodes.append(fragment_fromstring(content, create_parent="p"))
+
+        top_node.extend(nodes)
+        return top_node
+
+
+    def post_cleanup(self, top_node):
+        node = super().post_cleanup(top_node)  # keep base cleanup
+
+        # now remove CTV promo <ul> blocks
+        self.remove_ctv_promo_lists(node)
+
+        return node   
+    
+    def remove_ctv_promo_lists(self, node):
+        """
+        Remove CTV promo <ul> blocks after extraction.
+
+        Matches if:
+          - <ul> contains an <a> whose href includes ctvnews.ca/app or .../newsletters
+          - OR the raw HTML inside the <ul> contains one of EXCLUDE_PHRASES
+        """
+        uls = self.parser.getElementsByTag(node, tag="ul")
+
+        for ul in list(uls):
+            # 1) link-based match
+            anchors = self.parser.getElementsByTag(ul, tag="a")
+            if any(self._PROMO_HREF_RE.search(self.parser.getAttribute(a, "href") or "")
+                   for a in anchors):
+                self.parser.remove(ul)
+                continue
+
+            # 2) phrase-based match (on the UL's HTML)
+            ul_html = self.parser.outerHtml(ul)  # if your parser wrapper supports this
+            if ul_html and self._phrases_re.search(ul_html):
+                self.parser.remove(ul)
