@@ -1441,3 +1441,41 @@ class CTVNewsContentExtractor(ContentExtractor):
             ul_html = self.parser.outerHtml(ul)  # if your parser wrapper supports this
             if ul_html and self._phrases_re.search(ul_html):
                 self.parser.remove(ul)
+
+    def get_publishing_date(self, url, doc, html=""):
+        """
+        CTV override:
+            1) Prefer 'Published:' <time datetime="..."> from the DOM
+            2) Fallback to the base extractor logic
+        """
+        published = self._extract_ctv_published_datetime(doc)
+        if published:
+            return published
+
+        return super().get_publishing_date(url, doc, html)
+
+    def _extract_ctv_published_datetime(self, doc) -> datetime | None:
+        """
+        Extract the datetime for the *Published* label, not Updated.
+
+        Works for CTV blocks like:
+            Published: <time datetime="...">...</time>
+            Updated:   <time datetime="...">...</time>
+        """
+        if doc is None:
+            return None
+
+        # Robust against CTV's sometimes-invalid nesting; scope to the <p> containing "Published"
+        nodes = doc.xpath(".//p[contains(normalize-space(.), 'Published')]/time[@datetime]")
+        if not nodes:
+            return None
+
+        dt_str = nodes[0].get("datetime")
+        if not dt_str:
+            return None
+
+        try:
+            # Handles ISO 8601 with Z and fractional seconds
+            return date_parser(dt_str)
+        except Exception:
+            return None
