@@ -62,6 +62,9 @@ def get_html_2XX_only(url, config=None, response=None):
     response = requests.get(
         url=url, **get_request_kwargs(timeout, useragent, proxies, headers))
 
+    if config.request_callback:
+        config.request_callback()
+
     html = _get_html_from_response(response, config)
 
     if config.http_success_only:
@@ -110,6 +113,8 @@ class MRequest(object):
                 self.timeout, self.useragent, self.proxies, self.headers))
             if self.config.http_success_only:
                 self.resp.raise_for_status()
+            if self.config.request_callback:
+                self.config.request_callback()
         except requests.exceptions.RequestException as e:
             log.critical('[REQUEST FAILED] ' + str(e))
 
