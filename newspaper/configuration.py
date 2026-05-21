@@ -85,6 +85,8 @@ class Configuration(object):
         self.extractor = ContentExtractor
         self.document_cleaner = DocumentCleaner
 
+        self.request_callback = None
+
     def get_language(self):
         return self._language
 
