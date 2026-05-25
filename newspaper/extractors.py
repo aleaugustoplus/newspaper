@@ -1479,3 +1479,18 @@ class CTVNewsContentExtractor(ContentExtractor):
             return date_parser(dt_str)
         except Exception:
             return None
+
+
+class LeDevoirContentExtractor(ContentExtractor):
+    """Le Devoir serves all articles via RSS feeds (feeds_only=True).
+    URLs in RSS <link> tags are editorially curated article links — they
+    don't need the generic valid_url() heuristics, which were designed for
+    filtering URLs scraped from HTML category pages and reject many
+    legitimate Le Devoir URLs (short slugs, no date in path).
+    Setting skip_feed_url_purge signals feeds_to_articles() to trust
+    the feed URLs directly.
+    """
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.config.skip_feed_url_purge = True

@@ -271,7 +271,8 @@ class Source(object):
                     config=self.config)
                 cur_articles.append(article)
 
-            cur_articles = self.purge_articles('url', cur_articles)
+            if not self.config.skip_feed_url_purge:
+                cur_articles = self.purge_articles('url', cur_articles)
             after_purge = len(cur_articles)
 
             if self.config.memoize_articles:

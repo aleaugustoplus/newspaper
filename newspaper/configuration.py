@@ -87,6 +87,7 @@ class Configuration(object):
 
         self.request_callback = None
         self.feeds_only = False
+        self.skip_feed_url_purge = False
 
     def get_language(self):
         return self._language
