@@ -86,6 +86,7 @@ class Configuration(object):
         self.document_cleaner = DocumentCleaner
 
         self.request_callback = None
+        self.feeds_only = False
 
     def get_language(self):
         return self._language

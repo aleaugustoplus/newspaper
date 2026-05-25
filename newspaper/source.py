@@ -91,9 +91,10 @@ class Source(object):
         self.download()
         self.parse()
 
-        self.set_categories()
-        self.download_categories()  # mthread
-        self.parse_categories()
+        if not self.config.feeds_only:
+            self.set_categories()
+            self.download_categories()  # mthread
+            self.parse_categories()
 
         self.set_feeds()
         self.download_feeds()  # mthread
