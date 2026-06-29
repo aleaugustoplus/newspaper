@@ -1165,13 +1165,8 @@ class LeDroitContentExtractor(ContentExtractor):
 
 class RadioCanadaContentExtractor(ContentExtractor):
     def get_publishing_date(self, url, doc, html=""):
-        """3 strategies for publishing date extraction. The strategies
-        are descending in accuracy and the next strategy is only
-        attempted if a preferred one fails.
-
-        1. Pubdate from URL
-        2. Pubdate from metadata
-        3. Raw regex searches in the HTML + added heuristics
+        """Tries Radio Canada-specific metadata first (data-testid="custom-date"),
+        then falls back to the base class strategies (URL, metadata, HTML regex).
         """
         for spec in self.PUBLISH_DATE_META:
             meta_tags = self.parser.getElementsByTag(
@@ -1186,7 +1181,7 @@ class RadioCanadaContentExtractor(ContentExtractor):
                 if datetime_obj:
                     return datetime_obj
 
-        return None
+        return super().get_publishing_date(url, doc, html)
 
 
 class NationalPostContentExtractor(ContentExtractor):
