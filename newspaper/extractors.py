@@ -1185,37 +1185,69 @@ class RadioCanadaContentExtractor(ContentExtractor):
 
 
 class NationalPostContentExtractor(ContentExtractor):
-    def get_publishing_date(self, url, doc, html=""):
-        known_tags = [
-            ('script', {"type": "application/ld+json"}, lambda x: json.loads(x.text)['datePublished']),
-            ('span', {"class": "published-date__since"}, None),
-            ('div', {"class": "published-date"}, None)
-        ]
+    # Body containers, newest layout first.
+    # Nov 2026 redesign: paragraphs live in div.article-content__content-group.
+    # Free pages (e.g. press releases) serve the full text there; paywalled
+    # articles serve only a short teaser, which is_valid_body() rejects.
+    # Pre-Nov 2026 layout: div.story-v2-content-element-inline blocks.
+    # No generic fallback: if neither container is found, the body is empty and
+    # the article is rejected as Invalid Body, so a future redesign fails loudly
+    # instead of storing related-story text as the article.
+    BODY_CONTAINER_CLASS = "article-content__content-group"
+    LEGACY_BODY_CLASS = "story-v2-content-element-inline"
 
-        parsed_article = BeautifulSoup(html, 'html.parser')
-        for tag, attrs, accessor in known_tags:
-            publish_date = parsed_article.find(tag, attrs)
-            if publish_date:
-                if accessor:
-                    try:
-                        publish_date = accessor(publish_date)
-                    except:
-                        continue
-                else:
-                    publish_date = publish_date.text
-                publish_date = _parse_date_str(publish_date)
+    @staticmethod
+    def _ldjson_date_published(script_text):
+        """Return the first datePublished in an ld+json block, including
+        blocks that wrap their entities in an @graph list (Nov 2026 layout)."""
+        try:
+            data = json.loads(script_text, strict=False)
+        except (ValueError, TypeError):
+            return None
+        stack = [data]
+        while stack:
+            item = stack.pop(0)
+            if isinstance(item, list):
+                stack.extend(item)
+            elif isinstance(item, dict):
+                if item.get("datePublished"):
+                    return item["datePublished"]
+                if "@graph" in item:
+                    stack.append(item["@graph"])
+        return None
+
+    def get_publishing_date(self, url, doc, html=""):
+        if html:
+            parsed_article = BeautifulSoup(html, 'html.parser')
+
+            for script in parsed_article.find_all('script', {"type": "application/ld+json"}):
+                publish_date = _parse_date_str(self._ldjson_date_published(script.string or script.text))
                 if publish_date:
                     return publish_date
 
+            # Pre-Nov 2026 layout
+            for tag, attrs in [('span', {"class": "published-date__since"}),
+                               ('div', {"class": "published-date"})]:
+                node = parsed_article.find(tag, attrs)
+                if node:
+                    publish_date = _parse_date_str(node.text)
+                    if publish_date:
+                        return publish_date
+
+        # URL, article:published_time meta, and generic HTML heuristics
+        return super().get_publishing_date(url, doc, html)
+
     def nodes_to_check(self, doc):
-        """Returns a list of nodes we want to search
-        on like paragraphs and tables
-        """
+        """Returns the nodes to score when picking the article body."""
         nodes_to_check = []
-        for tag in ['section']:
-            items = self.parser.getElementsByTag(doc, tag="div", attr="class", value="story-v2-content-element-inline")
-            nodes_to_check += items
-        return nodes_to_check
+        for container in self.parser.getElementsByTag(
+                doc, tag="div", attr="class", value=self.BODY_CONTAINER_CLASS):
+            nodes_to_check += self.parser.getElementsByTag(container, tag="p")
+        if nodes_to_check:
+            return nodes_to_check
+
+        return self.parser.getElementsByTag(
+            doc, tag="div", attr="class", value=self.LEGACY_BODY_CLASS)
 
 
 class CTVNewsContentExtractor(ContentExtractor):
